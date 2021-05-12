@@ -4,11 +4,20 @@ import time
 from confluent_kafka import Producer, KafkaError, Consumer
 from confluent_kafka.admin import AdminClient, NewTopic
 
-from config import Config
-from utils.logger.vox_logger import get_logger
+from logging import getLogger, basicConfig, Formatter, INFO
+from logging.handlers import TimedRotatingFileHandler
+from os.path import splitext, basename
+from time import sleep
 
-logger = get_logger()
+basicConfig(
+    level=INFO,
+    format='%(asctime)s %(levelname)-8s %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[TimedRotatingFileHandler(('logs/%s.log' % "my-kafka"), when='D')],
+)
+logger = getLogger("Kafka-test")
 
+kafka_address = "localhost:9092"
 
 class BaseKafkaProducer(object):
     """
@@ -18,19 +27,21 @@ class BaseKafkaProducer(object):
     def __init__(self, topic):
         self.topic = topic
         self.producer = Producer({
-            'bootstrap.servers': Config.kafka_address,
+            'bootstrap.servers': kafka_address,
             'log.connection.close': False
         })
 
-        self.logger = get_logger("app", Config.stage, "kafka")
+        self.logger = logger
 
         self.create_topic()
-        self.partitions = self.producer.list_topics().topics[self.topic].partitions
+        self.partitions = self.producer.list_topics(
+        ).topics[self.topic].partitions
 
     def create_topic(self, num_partitions=3, replication_factor=1):
         if self.topic not in self.producer.list_topics().topics:
-            ac = AdminClient({'bootstrap.servers': Config.kafka_address})
-            futmap = ac.create_topics([NewTopic(self.topic, num_partitions, replication_factor)])
+            ac = AdminClient({'bootstrap.servers': kafka_address})
+            futmap = ac.create_topics(
+                [NewTopic(self.topic, num_partitions, replication_factor)])
             time.sleep(2)
             self.logger.debug(f'[kafka]create new topic [{self.topic}]')
 
@@ -38,7 +49,8 @@ class BaseKafkaProducer(object):
         if err:
             self.logger.error(f'[kafka]message delivered failed: {err}')
         else:
-            self.logger.debug(f'[kafka]message delivered to {msg.topic()} [{msg.partition()}]')
+            self.logger.debug(
+                f'[kafka]message delivered to {msg.topic()} [{msg.partition()}]')
 
     def get_target_partition_id(self, key):
         return hash(key) % len(self.partitions)
@@ -52,7 +64,8 @@ class BaseKafkaProducer(object):
         )
         if flush:
             self.flush()
-            self.logger.debug(f'[kafka]message had delivered, topic is {self.topic}; id is: [{key}]')
+            self.logger.debug(
+                f'[kafka]message had delivered, topic is {self.topic}; id is: [{key}]')
 
     def flush(self):
         self.producer.flush()
@@ -66,7 +79,7 @@ class BaseKafkaConsumer(object):
     def __init__(self, topic, group_id):
         self.topic = topic
         self.consumer = Consumer({
-            'bootstrap.servers': Config.kafka_address,
+            'bootstrap.servers': kafka_address,
             'group.id': group_id,
             'default.topic.config': {'auto.offset.reset': 'smallest'},
         })
@@ -76,7 +89,7 @@ class BaseKafkaConsumer(object):
 
         self.consumer.subscribe([self.topic])
 
-        self.logger = get_logger("app", Config.stage, "kafka")
+        self.logger = logger
 
     def run(self, callbacks=None):
         if callbacks is None:
@@ -92,9 +105,11 @@ class BaseKafkaConsumer(object):
                     value = msg.value()
                     try:
                         data = json.loads(value.decode('utf-8'))
+                        print(data)
                     except Exception as ex:
                         self.logger.error(
-                            '[kafka]json.loads message failed: {0}\nvalue: {1}'.format(ex, value)
+                            '[kafka]json.loads message failed: {0}\nvalue: {1}'.format(
+                                ex, value)
                         )
                     else:
                         self.logger.info(
@@ -106,7 +121,8 @@ class BaseKafkaConsumer(object):
                 # 参考https://stackoverflow.com/questions/47215245/error-cb-in-confluent-kafka-python-producers-and-consumers
                 # 作者的回复 对于_TRANSPORT 可以先忽略
                 elif msg.error().code() not in [KafkaError._PARTITION_EOF, KafkaError._TRANSPORT]:
-                    self.logger.error('[kafka]message received failed: {0}'.format(msg.error()))
+                    self.logger.error(
+                        '[kafka]message received failed: {0}'.format(msg.error()))
                     break
 
         except KeyboardInterrupt as e:
@@ -114,4 +130,3 @@ class BaseKafkaConsumer(object):
 
         finally:
             self.consumer.close()
-
