@@ -1,3 +1,5 @@
+# Work dir
+`cd /opt/kafka/bin`
 # Create topic
 `kafka-topics.sh --create --topic test1 --replication-factor 3 --partitions 2 --zookeeper zoo1:2181`
 # Produce
