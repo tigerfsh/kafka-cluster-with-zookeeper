@@ -1,4 +1,4 @@
-from .kafka_base import BaseKafkaProducer, BaseKafkaConsumer
+from kafka_base import BaseKafkaProducer, BaseKafkaConsumer
 
 class TestConsumer(BaseKafkaConsumer):
     pass 

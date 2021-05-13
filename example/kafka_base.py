@@ -84,8 +84,8 @@ class BaseKafkaConsumer(object):
             'default.topic.config': {'auto.offset.reset': 'smallest'},
         })
 
-        assert self.topic in self.consumer.list_topics().topics, \
-            'Kafka.Consumer.init: not found topic[{0}]'.format(self.topic)
+        # assert self.topic in self.consumer.list_topics().topics, \
+        #     'Kafka.Consumer.init: not found topic[{0}]'.format(self.topic)
 
         self.consumer.subscribe([self.topic])
 
